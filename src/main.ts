@@ -1,12 +1,40 @@
-import { INestApplication } from '@nestjs/common';
+import { INestApplication, Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
-
 import { AppModule } from './app.module';
+import { DocumentBuilder, OpenAPIObject, SwaggerModule } from '@nestjs/swagger';
+import { CorsConfig } from './shared/models/cors-config.model';
 
 const bootstrap: () => Promise<void> = async(): Promise<void> => {
   const app: INestApplication = await NestFactory.create(AppModule);
-  const port: number = 3000;
+  const port = +(process.env.APP_PORT || 3000);
+  const logger: Logger = new Logger('bootstrap');
+
+  const cors: CorsConfig = {
+    origin: '*',
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
+    credentials: true,
+  };
+  app.enableCors(cors);
+  app.useGlobalPipes(
+    new ValidationPipe({
+      transform: true,
+      whitelist: true,
+      forbidNonWhitelisted: true,
+    }),
+  );
+
+  const configuration: Omit<OpenAPIObject, 'paths'> = new DocumentBuilder()
+  .setTitle('Criply')
+  .setDescription('Criply Official')
+  .setVersion('1.0')
+  .addBearerAuth()
+  .build();
+
+  const document: OpenAPIObject = SwaggerModule.createDocument(app, configuration);
+  SwaggerModule.setup('api', app, document);
 
   await app.listen(port);
+
+  logger.log(`Application is running on port ${port}`);
 };
 bootstrap();
